@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Avatar from '../components/Avatar.jsx'
-import { LOCATIONS, MISSIONS, resetGame } from '../data/backend.js'
+import { LOCATIONS, MISSIONS, resetGame, linkGoogle } from '../data/backend.js'
 import { SLOTS, itemById } from '../data/items.js'
 import FittingRoom from './FittingRoom.jsx'
 
@@ -40,6 +40,18 @@ export default function Profile({ state }) {
         <h3>Chơi thế nào?</h3>
         <p>Đi đến các địa điểm nổi tiếng ở Sài Gòn, check-in và chụp ảnh để nhận 🍩. Dùng 🍩 sắm đồ cho Bé Na, rồi khoe với bạn bè!</p>
       </div>
+
+      {state.account?.anonymous ? (
+        <div className="card center">
+          <b>Tài khoản khách</b>
+          <p className="muted">Liên kết Google để giữ nhân vật và 🍩 khi đổi điện thoại</p>
+          <button className="btn btn-sm" onClick={linkGoogle}>🔗 Liên kết với Google</button>
+        </div>
+      ) : (
+        <div className="card center">
+          <small className="muted">✅ Đã liên kết tài khoản: {state.account?.email}</small>
+        </div>
+      )}
 
       <button className="btn-ghost" onClick={() => { if (confirm('Xóa toàn bộ tiến trình và chơi lại từ đầu?')) resetGame() }}>
         Chơi lại từ đầu

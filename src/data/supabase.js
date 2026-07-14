@@ -29,10 +29,14 @@ export const MISSIONS = [
   { id: 'three-photos', goal: 3, progress: (s) => Object.values(s.visited).filter((v) => v.photo).length },
 ]
 
-const EMPTY = { donuts: 0, ownedItems: [], equipped: {}, visited: {}, posts: [], friends: [], claimed: [] }
+const EMPTY = {
+  donuts: 0, ownedItems: [], equipped: {}, visited: {}, posts: [], friends: [], claimed: [],
+  friendCode: null, account: { anonymous: true, email: null },
+}
 let state = { ...EMPTY }
 let toast = null
 let me = null
+let account = { anonymous: true, email: null }
 const listeners = new Set()
 
 const emit = () => listeners.forEach((fn) => fn())
@@ -66,6 +70,7 @@ async function start() {
   const { data: { user } } = await sb.auth.getUser()
   if (!user) throw new Error('không lấy được tài khoản')
   me = user.id
+  account = { anonymous: !!user.is_anonymous, email: user.email || null }
 
   // Nạp catalog địa điểm + tên/thưởng nhiệm vụ
   const [{ data: locs }, { data: miss }] = await Promise.all([
@@ -89,7 +94,7 @@ async function refresh() {
     sb.from('visits').select('*').eq('profile_id', me),
     sb.from('mission_claims').select('mission_id').eq('profile_id', me),
     sb.from('friendships').select('friend_id, profiles!friendships_friend_id_fkey(display_name, equipped)').eq('profile_id', me),
-    sb.from('posts').select('*, profiles(display_name)').order('created_at', { ascending: false }).limit(50),
+    sb.from('posts').select('*, profiles(display_name)').eq('hidden', false).order('created_at', { ascending: false }).limit(50),
   ])
 
   const visited = {}
@@ -99,6 +104,8 @@ async function refresh() {
 
   state = {
     donuts: profile.data?.donuts ?? 0,
+    friendCode: profile.data?.friend_code ?? null,
+    account,
     equipped: profile.data?.equipped ?? {},
     ownedItems: (owned.data || []).map((r) => r.item_id),
     visited,
@@ -118,12 +125,16 @@ function photoUrl(path) {
 
 function mapPost(p) {
   const who = p.profile_id === me ? 'Bạn' : p.profiles?.display_name || 'Người chơi'
+  const mine = p.profile_id === me
   const at = new Date(p.created_at).getTime()
   if (p.type === 'photo') {
-    return { id: p.id, type: 'photo', who, at, photo: photoUrl(p.payload.photo_path), locName: LOCATIONS.find((l) => l.id === p.payload.location_id)?.name }
+    return { id: p.id, type: 'photo', who, mine, at, photo: photoUrl(p.payload.photo_path), locName: LOCATIONS.find((l) => l.id === p.payload.location_id)?.name }
+  }
+  if (p.type === 'friend') {
+    return { id: p.id, type: 'friend', who, mine, at, friendName: p.payload.friend_name }
   }
   const itemName = p.payload.item_id ? itemById(p.payload.item_id)?.name : p.payload.set_id || 'bộ đồ mới'
-  return { id: p.id, type: 'outfit', who, at, itemName }
+  return { id: p.id, type: 'outfit', who, mine, at, itemName }
 }
 
 // ---------- REALTIME: nghe bạn bè thay đồ / đăng feed ----------
@@ -193,10 +204,22 @@ export async function setOutfit(outfit) {
   showToast('Đã cập nhật trang phục!')
 }
 
-// Kết bạn bằng mã: bản thật sẽ có màn nhập mã bạn bè.
-// Giữ tên addDemoFriend để UI không phải đổi; sau sẽ thay bằng addFriendByCode.
-export function addDemoFriend() {
-  showToast('Bản cloud: kết bạn bằng mã người chơi (sắp thêm màn nhập mã).')
+// Kết bạn bằng mã: máy chủ tra mã và ghi quan hệ 2 chiều
+export const addFriendByCode = (code) =>
+  call('rpc_add_friend', { p_code: code }, (name) => `Đã kết bạn với ${name}! 🤝`)
+
+// Báo cáo ảnh không phù hợp: đủ 3 lượt báo cáo là bài tự ẩn
+export const reportPost = (postId) =>
+  call('rpc_report_post', { p_post_id: postId }, 'Đã ghi nhận báo cáo. Cảm ơn bạn!')
+
+// Liên kết tài khoản ẩn danh với Google (giữ nguyên tiến trình).
+// Cần bật Google provider + "manual linking" trên Supabase — xem GOOGLE-LOGIN.md
+export async function linkGoogle() {
+  const { error } = await sb.auth.linkIdentity({
+    provider: 'google',
+    options: { redirectTo: window.location.origin },
+  })
+  if (error) showToast('Chưa liên kết được: ' + error.message)
 }
 
 export function resetGame() {

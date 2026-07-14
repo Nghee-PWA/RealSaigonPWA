@@ -48,6 +48,7 @@ create table if not exists catalog_missions (
 create table if not exists profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
   display_name  text not null default 'Bé Na',
+  friend_code   text unique,                          -- mã kết bạn (gán default bên dưới)
   donuts        int  not null default 50 check (donuts >= 0),
   equipped      jsonb not null default '{}'::jsonb,   -- {slot: item_id}
   last_login    date,                                 -- cho phần thưởng đăng nhập
@@ -55,6 +56,23 @@ create table if not exists profiles (
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
+
+-- Mã kết bạn 6 ký tự, tránh ký tự dễ nhầm (0/O, 1/I)
+create or replace function gen_friend_code()
+returns text language plpgsql as $$
+declare v_code text;
+begin
+  loop
+    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', (floor(random() * 31) + 1)::int, 1), '')
+      into v_code
+      from generate_series(1, 6);
+    exit when not exists (select 1 from profiles where friend_code = v_code);
+  end loop;
+  return v_code;
+end;
+$$;
+
+alter table profiles alter column friend_code set default gen_friend_code();
 
 -- ---------- ĐỒ ĐÃ SỞ HỮU ----------
 create table if not exists owned_items (
@@ -95,10 +113,21 @@ create table if not exists friendships (
 create table if not exists posts (
   id          uuid primary key default gen_random_uuid(),
   profile_id  uuid not null references profiles(id) on delete cascade,
-  type        text not null,              -- 'photo' | 'outfit'
+  type        text not null,              -- 'photo' | 'outfit' | 'friend'
   payload     jsonb not null default '{}'::jsonb,
+  hidden      boolean not null default false,  -- bị ẩn do bị báo cáo nhiều
   created_at  timestamptz not null default now()
 );
+
+-- ---------- BÁO CÁO ẢNH ----------
+-- Khóa chặt: không có policy — chỉ hàm RPC (security definer) ghi/đọc.
+create table if not exists photo_reports (
+  reporter   uuid not null references profiles(id) on delete cascade,
+  post_id    uuid not null references posts(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (reporter, post_id)
+);
+alter table photo_reports enable row level security;
 
 -- ============================================================
 -- BẬT RLS (Row Level Security) TRÊN MỌI BẢNG DỮ LIỆU NGƯỜI CHƠI
@@ -316,6 +345,55 @@ begin
   insert into mission_claims (profile_id, mission_id) values (v_me, p_mission_id);
   update profiles set donuts = donuts + v_reward, updated_at = now() where id = v_me;
   return v_reward;
+end;
+$$;
+
+-- ---- Kết bạn bằng mã: máy chủ tra mã, ghi quan hệ 2 chiều ----
+create or replace function rpc_add_friend(p_code text)
+returns text language plpgsql security definer
+set search_path = public as $$
+declare
+  v_me uuid := auth.uid();
+  v_other uuid;
+  v_other_name text;
+begin
+  if v_me is null then raise exception 'chưa đăng nhập'; end if;
+
+  select id, display_name into v_other, v_other_name
+    from profiles where friend_code = upper(trim(p_code));
+  if v_other is null then raise exception 'không tìm thấy mã này'; end if;
+  if v_other = v_me then raise exception 'không thể kết bạn với chính mình'; end if;
+  if exists (select 1 from friendships where profile_id = v_me and friend_id = v_other) then
+    raise exception 'hai bạn đã là bạn bè rồi';
+  end if;
+
+  insert into friendships (profile_id, friend_id)
+    values (v_me, v_other), (v_other, v_me);
+
+  insert into posts (profile_id, type, payload)
+    values (v_me, 'friend', jsonb_build_object('friend_name', v_other_name));
+
+  return v_other_name;
+end;
+$$;
+
+-- ---- Báo cáo ảnh: 1 người 1 lượt/bài; đủ 3 lượt thì bài tự ẩn ----
+create or replace function rpc_report_post(p_post_id uuid)
+returns void language plpgsql security definer
+set search_path = public as $$
+declare
+  v_me uuid := auth.uid();
+  v_count int;
+begin
+  if v_me is null then raise exception 'chưa đăng nhập'; end if;
+
+  insert into photo_reports (reporter, post_id) values (v_me, p_post_id)
+    on conflict do nothing;
+
+  select count(*) into v_count from photo_reports where post_id = p_post_id;
+  if v_count >= 3 then
+    update posts set hidden = true where id = p_post_id;
+  end if;
 end;
 $$;
 

@@ -55,6 +55,8 @@ const DEFAULT_STATE = {
   claimed: [], // nhiệm vụ đã nhận thưởng
   lastLogin: null, // ngày nhận thưởng đăng nhập gần nhất (YYYY-MM-DD)
   loginStreak: 0, // số ngày đăng nhập liên tục
+  friendCode: 'DEMO66', // bản cloud sinh mã thật trên máy chủ
+  account: { anonymous: true, email: null },
 }
 
 function load() {
@@ -178,19 +180,30 @@ export function buySet(setId) {
   showToast(`Đã sắm trọn bộ "${s.name}"!`)
 }
 
-export function addDemoFriend() {
+// Bản demo: nhập mã gì cũng được, thêm lần lượt bạn "ảo" từ FRIEND_POOL
+export function addFriendByCode() {
   const next = FRIEND_POOL.find((f) => !state.friends.some((fr) => fr.name === f.name))
   if (!next) {
-    showToast('Hết bạn demo rồi! Bản thật sẽ kết bạn qua Supabase.')
+    showToast('Hết bạn demo rồi! Bản cloud kết bạn với người thật.')
     return
   }
   const friend = { id: `f-${Date.now()}`, ...next }
-  const shirt = itemById(next.outfit.shirt)
   set({
     friends: [...state.friends, friend],
-    posts: [outfitPost(friend.name, shirt.name), ...state.posts],
+    posts: [
+      { id: `friend-${Date.now()}`, type: 'friend', who: 'Bạn', friendName: friend.name, at: Date.now() },
+      ...state.posts,
+    ],
   })
-  showToast(`${friend.name} đã trở thành bạn của bạn!`)
+  showToast(`Đã kết bạn với ${friend.name}! 🤝`)
+}
+
+export function reportPost() {
+  showToast('Đã ghi nhận báo cáo. (Bản demo)')
+}
+
+export function linkGoogle() {
+  showToast('Bản demo chưa có đăng nhập Google — dùng bản cloud nhé.')
 }
 
 export function claimMission(missionId) {
