@@ -1,0 +1,271 @@
+/* Giao diện pixel dễ thương: viền dày, bóng đổ vuông, màu kem/mint */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --ink: #4a3728;
+  --paper: #fdf6e3;
+  --mint: #8ed8c6;
+  --pink: #f2617a;
+  --yellow: #f2c14e;
+  --card: #ffffff;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Cascadia Mono', 'Courier New', ui-monospace, monospace;
+  -webkit-font-smoothing: none;
+}
+
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Thanh trên ---- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--mint);
+  border-bottom: 3px solid var(--ink);
+}
+
+.logo {
+  font-weight: bold;
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+
+.donuts {
+  background: var(--card);
+  border: 3px solid var(--ink);
+  padding: 4px 10px;
+  font-weight: bold;
+}
+
+/* ---- Nội dung ---- */
+main {
+  flex: 1;
+  padding: 14px 14px 90px;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+h2 { font-size: 20px; }
+h3 { font-size: 16px; margin-top: 6px; }
+
+.card {
+  background: var(--card);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(74, 55, 40, 0.25);
+  padding: 14px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.muted { color: #9a8c7e; }
+.reward { color: var(--pink); font-weight: bold; }
+
+/* ---- Nút ---- */
+.btn {
+  display: inline-block;
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: bold;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btn:active { transform: translate(3px, 3px); box-shadow: none; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn-sm { padding: 6px 10px; font-size: 13px; }
+
+.btn-ghost {
+  background: none;
+  border: none;
+  font: inherit;
+  color: #9a8c7e;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 6px;
+}
+
+/* ---- Danh sách địa điểm / bạn bè ---- */
+.loc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.loc-icon { font-size: 24px; }
+
+.loc-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---- Ảnh check-in ---- */
+.photo {
+  max-width: 100%;
+  border: 3px solid var(--ink);
+  image-rendering: auto;
+}
+
+/* ---- Nhiệm vụ ---- */
+.mission-head, .mission-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar {
+  height: 14px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  margin: 8px 0 6px;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--mint);
+  transition: width 0.3s;
+}
+
+/* ---- Cửa hàng ---- */
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Danh mục xuống dòng để thấy hết, không cần kéo ngang */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  flex-shrink: 0;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  padding: 6px 12px;
+  font: inherit;
+  font-weight: bold;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chip.active {
+  background: var(--yellow);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+/* ---- Saigon Diary ---- */
+.diary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.polaroid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 10px 10px 12px;
+}
+
+/* ---- Thống kê ---- */
+.stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.stat { text-align: center; padding: 10px 4px; }
+.stat-num { font-size: 20px; font-weight: bold; }
+.stat-label { font-size: 12px; color: #9a8c7e; }
+
+/* ---- Thanh điều hướng dưới ---- */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  background: var(--card);
+  border-top: 3px solid var(--ink);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  flex: 1;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--ink);
+  padding: 8px 2px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.tab.active { background: var(--mint); }
+.tab-icon { font-size: 20px; }
+.tab-label { font-size: 11px; }
+
+/* ---- Thông báo nhỏ ---- */
+.toast {
+  position: fixed;
+  bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(74, 55, 40, 0.25);
+  z-index: 20;
+  max-width: 90%;
+  text-align: center;
+}
