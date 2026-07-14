@@ -10,5 +10,5 @@
 //   ghi trong supabase.js: npm install, điền .env, chạy SQL).
 // ============================================================
 
-export * from './store.js' // ← DEMO (đang bật)
-// export * from './supabase.js'  // ← CLOUD (Supabase). Nhớ gọi init() trong main.jsx.
+// export * from './store.js' // ← DEMO (localStorage)
+export * from './supabase.js' // ← CLOUD (Supabase) — ĐANG BẬT

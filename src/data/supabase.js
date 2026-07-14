@@ -48,10 +48,23 @@ export function showToast(msg) {
 
 // ---------- KHỞI ĐỘNG ----------
 export async function init() {
+  try {
+    await start()
+  } catch (e) {
+    showToast('Lỗi kết nối: ' + (e?.message || e))
+    console.error('[NNN] init lỗi:', e)
+  }
+}
+
+async function start() {
   // Đăng nhập ẩn danh: mở app là có "thẻ" vô hình ngay
   const { data: { session } } = await sb.auth.getSession()
-  if (!session) await sb.auth.signInAnonymously()
+  if (!session) {
+    const { error } = await sb.auth.signInAnonymously()
+    if (error) throw error
+  }
   const { data: { user } } = await sb.auth.getUser()
+  if (!user) throw new Error('không lấy được tài khoản')
   me = user.id
 
   // Nạp catalog địa điểm + tên/thưởng nhiệm vụ

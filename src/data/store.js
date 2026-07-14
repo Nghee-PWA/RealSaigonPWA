@@ -94,6 +94,10 @@ export function subscribe(fn) {
   return () => listeners.delete(fn)
 }
 
+// Bản demo không cần khởi động gì; export no-op để backend.js giữ đúng
+// bộ hàm giống supabase.js (main.jsx gọi init() an toàn ở cả 2 chế độ).
+export const init = () => {}
+
 export const getState = () => state
 export const getToast = () => toast
 
