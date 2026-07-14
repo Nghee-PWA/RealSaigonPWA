@@ -153,6 +153,16 @@ export function unequipSlot(slot) {
   set({ equipped: { ...state.equipped, [slot]: null } })
 }
 
+// Mặc cả một bộ cùng lúc (dùng cho Phòng thử đồ). Chỉ nhận món đã sở hữu.
+export function setOutfit(outfit) {
+  const clean = {}
+  for (const [slot, id] of Object.entries(outfit)) {
+    clean[slot] = id && state.ownedItems.includes(id) ? id : null
+  }
+  set({ equipped: clean, posts: [outfitPost('Bạn', 'bộ đồ mới'), ...state.posts] })
+  showToast('Đã cập nhật trang phục!')
+}
+
 export function buySet(setId) {
   const s = setById(setId)
   if (!s || state.donuts < s.price) return

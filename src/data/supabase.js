@@ -122,7 +122,7 @@ function mapPost(p) {
   if (p.type === 'photo') {
     return { id: p.id, type: 'photo', who, at, photo: photoUrl(p.payload.photo_path), locName: LOCATIONS.find((l) => l.id === p.payload.location_id)?.name }
   }
-  const itemName = p.payload.item_id ? itemById(p.payload.item_id)?.name : p.payload.set_id
+  const itemName = p.payload.item_id ? itemById(p.payload.item_id)?.name : p.payload.set_id || 'bộ đồ mới'
   return { id: p.id, type: 'outfit', who, at, itemName }
 }
 
@@ -179,6 +179,18 @@ export async function equipItem(itemId) {
 export async function unequipSlot(slot) {
   await sb.from('profiles').update({ equipped: { ...state.equipped, [slot]: null } }).eq('id', me)
   await refresh()
+}
+
+// Mặc cả một bộ cùng lúc (Phòng thử đồ) — một lần cập nhật, một bài feed.
+export async function setOutfit(outfit) {
+  const clean = {}
+  for (const [slot, id] of Object.entries(outfit)) {
+    clean[slot] = id && state.ownedItems.includes(id) ? id : null
+  }
+  await sb.from('profiles').update({ equipped: clean }).eq('id', me)
+  await sb.from('posts').insert({ profile_id: me, type: 'outfit', payload: { note: 'outfit' } })
+  await refresh()
+  showToast('Đã cập nhật trang phục!')
 }
 
 // Kết bạn bằng mã: bản thật sẽ có màn nhập mã bạn bè.

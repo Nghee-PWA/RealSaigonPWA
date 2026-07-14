@@ -1,11 +1,16 @@
+import { useState } from 'react'
 import Avatar from '../components/Avatar.jsx'
 import { LOCATIONS, MISSIONS, resetGame } from '../data/backend.js'
 import { SLOTS, itemById } from '../data/items.js'
+import FittingRoom from './FittingRoom.jsx'
 
 export default function Profile({ state }) {
+  const [fitting, setFitting] = useState(false)
   const visitedCount = Object.keys(state.visited).length
   const missionsDone = MISSIONS.filter((m) => m.progress(state) >= m.goal).length
   const wearing = SLOTS.map((s) => state.equipped[s.id] && itemById(state.equipped[s.id])?.name).filter(Boolean)
+
+  if (fitting) return <FittingRoom state={state} onClose={() => setFitting(false)} />
 
   return (
     <div className="screen">
@@ -13,6 +18,7 @@ export default function Profile({ state }) {
         <Avatar outfit={state.equipped} size={220} />
         <h2>Bé Na</h2>
         <p className="muted">{wearing.length ? wearing.join(' · ') : 'Vanilla nguyên bản — vào Store sắm đồ nào!'}</p>
+        <button className="btn" onClick={() => setFitting(true)}>👗 Phòng thử đồ</button>
       </div>
 
       <div className="stat-row">
