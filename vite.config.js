@@ -11,8 +11,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'NNN — Khám phá Sài Gòn',
-        short_name: 'NNN',
+        name: 'Khám Phá Sài Gòn',
+        short_name: 'Real Saigon',
         description: 'Game khám phá Sài Gòn: đến địa điểm, chụp ảnh, nhận quà, sắm đồ cho nhân vật.',
         lang: 'vi',
         theme_color: '#8ed8c6',
