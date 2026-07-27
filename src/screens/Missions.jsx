@@ -1,21 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { LOCATIONS, MISSIONS, checkIn, claimMission } from '../data/backend.js'
+import { startGeo, subscribeGeo, getLastPosition, getGeoStatus, distanceMeters } from '../data/geo.js'
 
 const CHECKIN_RADIUS_M = 350 // được phép check-in khi ở trong bán kính này
 
-function distanceMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000
-  const toRad = (d) => (d * Math.PI) / 180
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(a))
-}
-
 // Nén ảnh trước khi lưu: thu nhỏ về tối đa 900px, chất lượng 70%.
-// Sau này ảnh sẽ up lên kho ảnh Supabase thay vì lưu trên máy.
 function compressPhoto(file) {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -35,29 +24,18 @@ function compressPhoto(file) {
 
 export default function Missions({ state }) {
   const [selected, setSelected] = useState(null)
-  const [geo, setGeo] = useState({ status: 'idle' }) // idle | checking | near | far | error
   const [photo, setPhoto] = useState(null)
+  const [simulated, setSimulated] = useState(false) // nút thử nghiệm
+
+  // Vị trí sống: xin phép MỘT LẦN khi vào tab, rồi cập nhật liên tục
+  const pos = useSyncExternalStore(subscribeGeo, getLastPosition)
+  const geoStatus = useSyncExternalStore(subscribeGeo, getGeoStatus)
+  useEffect(() => { startGeo() }, [])
 
   const openLocation = (loc) => {
     setSelected(loc)
-    setGeo({ status: 'idle' })
     setPhoto(null)
-  }
-
-  const verifyPosition = () => {
-    setGeo({ status: 'checking' })
-    if (!navigator.geolocation) {
-      setGeo({ status: 'error', msg: 'Thiết bị không hỗ trợ định vị' })
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const d = distanceMeters(pos.coords.latitude, pos.coords.longitude, selected.lat, selected.lng)
-        setGeo(d <= CHECKIN_RADIUS_M ? { status: 'near' } : { status: 'far', distance: d })
-      },
-      () => setGeo({ status: 'error', msg: 'Không lấy được vị trí — hãy cho phép truy cập vị trí' }),
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+    setSimulated(false)
   }
 
   const onPickPhoto = async (e) => {
@@ -69,6 +47,10 @@ export default function Missions({ state }) {
     checkIn(selected.id, photo)
     setSelected(null)
   }
+
+  // Khoảng cách từ vị trí sống tới địa điểm đang xem (nếu đã có vị trí)
+  const distance = selected && pos ? distanceMeters(pos.lat, pos.lng, selected.lat, selected.lng) : null
+  const near = simulated || (distance !== null && distance <= CHECKIN_RADIUS_M)
 
   // ---- Màn hình chi tiết một địa điểm (luồng check-in) ----
   if (selected) {
@@ -87,25 +69,10 @@ export default function Missions({ state }) {
             <p>✅ Bạn đã check-in nơi này rồi!</p>
             {done.photo && <img className="photo" src={done.photo} alt={selected.name} />}
           </div>
-        ) : geo.status !== 'near' ? (
+        ) : near ? (
+          // Đã tới nơi (tự nhận ra từ vị trí sống) → chụp ảnh luôn
           <div className="card center">
-            <p>Bước 1: đến nơi và xác nhận vị trí</p>
-            <button className="btn" onClick={verifyPosition} disabled={geo.status === 'checking'}>
-              {geo.status === 'checking' ? 'Đang định vị…' : '📍 Tôi đã đến nơi!'}
-            </button>
-            {geo.status === 'far' && (
-              <p className="muted">Bạn còn cách {Math.round(geo.distance)}m. Đến gần hơn nhé!</p>
-            )}
-            {geo.status === 'error' && <p className="muted">{geo.msg}</p>}
-            {(geo.status === 'far' || geo.status === 'error') && (
-              <button className="btn-ghost" onClick={() => setGeo({ status: 'near' })}>
-                🧪 Giả lập vị trí (chỉ để thử nghiệm)
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="card center">
-            <p>Bước 2: chụp một tấm ảnh tại đây!</p>
+            <p>📍 Bạn đang ở đây! Chụp một tấm ảnh nào.</p>
             {photo ? (
               <>
                 <img className="photo" src={photo} alt="Ảnh check-in" />
@@ -118,6 +85,22 @@ export default function Missions({ state }) {
               </label>
             )}
           </div>
+        ) : (
+          // Chưa tới nơi — dùng vị trí sống, KHÔNG hỏi lại quyền
+          <div className="card center">
+            {geoStatus === 'denied' ? (
+              <p className="muted">Bạn đã từ chối quyền vị trí. Bật lại trong cài đặt trình duyệt để check-in.</p>
+            ) : geoStatus === 'unsupported' ? (
+              <p className="muted">Thiết bị không hỗ trợ định vị.</p>
+            ) : distance === null ? (
+              <p className="muted">📡 Đang lấy vị trí của bạn…</p>
+            ) : (
+              <p className="muted">Bạn còn cách <b>{Math.round(distance)}m</b>. Đến gần hơn là tự động mở nút chụp ảnh nhé!</p>
+            )}
+            <button className="btn-ghost" onClick={() => setSimulated(true)}>
+              🧪 Giả lập vị trí (chỉ để thử nghiệm)
+            </button>
+          </div>
         )}
       </div>
     )
@@ -129,16 +112,21 @@ export default function Missions({ state }) {
       <h2>Nhiệm vụ</h2>
       <h3>📍 Đi các nơi</h3>
       <p className="muted">Đến địa điểm, check-in bằng GPS, chụp ảnh nhận 🍩</p>
-      {LOCATIONS.map((loc) => (
-        <button key={loc.id} className="card loc-row" onClick={() => openLocation(loc)}>
-          <span className="loc-icon">{state.visited[loc.id] ? '✅' : '📍'}</span>
-          <span className="loc-info">
-            <b>{loc.name}</b>
-            <small className="muted">{loc.desc}</small>
-          </span>
-          <span className="reward">+{loc.reward}🍩</span>
-        </button>
-      ))}
+      {LOCATIONS.map((loc) => {
+        const d = pos ? distanceMeters(pos.lat, pos.lng, loc.lat, loc.lng) : null
+        return (
+          <button key={loc.id} className="card loc-row" onClick={() => openLocation(loc)}>
+            <span className="loc-icon">{state.visited[loc.id] ? '✅' : '📍'}</span>
+            <span className="loc-info">
+              <b>{loc.name}</b>
+              <small className="muted">
+                {d !== null && !state.visited[loc.id] ? `Cách bạn ~${d < 1000 ? Math.round(d) + 'm' : (d / 1000).toFixed(1) + 'km'}` : loc.desc}
+              </small>
+            </span>
+            <span className="reward">+{loc.reward}🍩</span>
+          </button>
+        )
+      })}
 
       <h3>🎯 Thử thách</h3>
       {MISSIONS.map((m) => {
