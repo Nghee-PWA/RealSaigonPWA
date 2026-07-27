@@ -1,15 +1,16 @@
 // ============================================================
-// THEO DÕI VỊ TRÍ "SỐNG"
+// LẤY VỊ TRÍ "KHI CẦN" (tiết kiệm pin)
 //
-// Xin quyền vị trí MỘT LẦN mỗi session, rồi cập nhật vị trí liên
-// tục trong nền (watchPosition) khi người chơi di chuyển. Nhờ vậy
-// đến địa điểm mới không phải xin phép lại, cũng không phải chờ
-// "đang định vị" — app đã biết sẵn vị trí mới nhất.
+// KHÔNG theo dõi GPS chạy nền. Chỉ bật GPS đúng lúc người chơi
+// cần (mở một địa điểm để check-in), đo một phát rồi tắt.
+//
+// - Trình duyệt tự NHỚ quyền → sau lần đầu KHÔNG hỏi phép lại.
+// - Có nhớ kết quả gần nhất: nếu vừa đo cách đây chưa lâu thì trả
+//   lại tức thì, KHÔNG bật GPS lần nữa → không hao pin, không nóng.
 // ============================================================
 
-let watchId = null
 let last = null // { lat, lng, accuracy, at }
-let status = 'idle' // idle | watching | denied | unsupported
+let status = 'idle' // idle | locating | ok | denied | error | unsupported
 const listeners = new Set()
 const emit = () => listeners.forEach((fn) => fn())
 
@@ -17,28 +18,25 @@ export const subscribeGeo = (fn) => { listeners.add(fn); return () => listeners.
 export const getLastPosition = () => last
 export const getGeoStatus = () => status
 
-// Gọi một lần (vd khi vào tab Nhiệm vụ). Lần đầu sẽ bật popup xin
-// phép; các lần sau không làm gì nếu đã đang theo dõi.
-export function startGeo() {
-  if (watchId !== null) return
-  if (!('geolocation' in navigator)) { status = 'unsupported'; emit(); return }
-  status = 'watching'; emit()
-  watchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      last = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, at: Date.now() }
-      status = 'watching'
-      emit()
-    },
-    (err) => {
-      if (err.code === err.PERMISSION_DENIED) status = 'denied'
-      emit()
-    },
-    { enableHighAccuracy: true, maximumAge: 10000, timeout: 25000 }
-  )
-}
-
-export function stopGeo() {
-  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null }
+// Đo vị trí MỘT LẦN. Nếu đã có kết quả mới hơn maxAgeMs thì dùng lại
+// ngay (không bật GPS). timeout để không "quay" mãi nếu bắt sóng kém.
+export function locate({ maxAgeMs = 60000 } = {}) {
+  return new Promise((resolve) => {
+    if (last && Date.now() - last.at <= maxAgeMs) { resolve(last); return }
+    if (!('geolocation' in navigator)) { status = 'unsupported'; emit(); resolve(null); return }
+    status = 'locating'; emit()
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        last = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, at: Date.now() }
+        status = 'ok'; emit(); resolve(last)
+      },
+      (err) => {
+        status = err.code === err.PERMISSION_DENIED ? 'denied' : 'error'
+        emit(); resolve(null)
+      },
+      { enableHighAccuracy: true, maximumAge: maxAgeMs, timeout: 20000 }
+    )
+  })
 }
 
 // Khoảng cách (mét) giữa 2 tọa độ — công thức haversine

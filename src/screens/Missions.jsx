@@ -1,6 +1,6 @@
-import { useState, useEffect, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { LOCATIONS, MISSIONS, checkIn, claimMission } from '../data/backend.js'
-import { startGeo, subscribeGeo, getLastPosition, getGeoStatus, distanceMeters } from '../data/geo.js'
+import { locate, subscribeGeo, getLastPosition, getGeoStatus, distanceMeters } from '../data/geo.js'
 
 const CHECKIN_RADIUS_M = 350 // được phép check-in khi ở trong bán kính này
 
@@ -27,15 +27,15 @@ export default function Missions({ state }) {
   const [photo, setPhoto] = useState(null)
   const [simulated, setSimulated] = useState(false) // nút thử nghiệm
 
-  // Vị trí sống: xin phép MỘT LẦN khi vào tab, rồi cập nhật liên tục
+  // Vị trí "khi cần": chỉ đo lúc mở địa điểm, không chạy nền
   const pos = useSyncExternalStore(subscribeGeo, getLastPosition)
   const geoStatus = useSyncExternalStore(subscribeGeo, getGeoStatus)
-  useEffect(() => { startGeo() }, [])
 
   const openLocation = (loc) => {
     setSelected(loc)
     setPhoto(null)
     setSimulated(false)
+    locate() // đo 1 lần (dùng lại kết quả gần đây nếu có → khỏi bật GPS)
   }
 
   const onPickPhoto = async (e) => {
@@ -86,17 +86,22 @@ export default function Missions({ state }) {
             )}
           </div>
         ) : (
-          // Chưa tới nơi — dùng vị trí sống, KHÔNG hỏi lại quyền
+          // Chưa tới nơi — đo khi cần, KHÔNG chạy nền, KHÔNG hỏi lại quyền
           <div className="card center">
             {geoStatus === 'denied' ? (
               <p className="muted">Bạn đã từ chối quyền vị trí. Bật lại trong cài đặt trình duyệt để check-in.</p>
             ) : geoStatus === 'unsupported' ? (
               <p className="muted">Thiết bị không hỗ trợ định vị.</p>
-            ) : distance === null ? (
+            ) : geoStatus === 'locating' ? (
               <p className="muted">📡 Đang lấy vị trí của bạn…</p>
+            ) : distance === null ? (
+              <p className="muted">Bấm nút bên dưới để kiểm tra bạn đã tới nơi chưa.</p>
             ) : (
-              <p className="muted">Bạn còn cách <b>{Math.round(distance)}m</b>. Đến gần hơn là tự động mở nút chụp ảnh nhé!</p>
+              <p className="muted">Bạn còn cách <b>{Math.round(distance)}m</b>. Tới nơi rồi thì bấm "Kiểm tra lại" nhé!</p>
             )}
+            <button className="btn" onClick={() => locate({ maxAgeMs: 0 })} disabled={geoStatus === 'locating'}>
+              📍 Tôi đã tới nơi — kiểm tra
+            </button>
             <button className="btn-ghost" onClick={() => setSimulated(true)}>
               🧪 Giả lập vị trí (chỉ để thử nghiệm)
             </button>
